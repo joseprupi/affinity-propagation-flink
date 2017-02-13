@@ -78,31 +78,20 @@ public class AffinityPropagationBulk {
 		DataSet<Tuple3<LongValue, LongValue, DoubleValue>> responsibilities = similarities
 
 			// Get a list of a(i,K) + s(i,K) values joining similarities with messages
-			.join(messages)
-			.where("f0","f1")
-			.equalTo("f0","f1")
-			.with(new joinAvailabilitySimilarity())
+			.join(messages).where("f0","f1").equalTo("f0","f1").with(new joinAvailabilitySimilarity())
 
 			// Get a dataset with 2 higher values
-			.groupBy("f1").sortGroup("f2", Order.DESCENDING)
-			.first(2)
+			.groupBy("f1").sortGroup("f2", Order.DESCENDING).first(2)
 
 			// Create a Tuple4<Trg, MaxValue, MaxNeighbour, SecondMaxValue> reducing the 2 tuples with higher values
-			.groupBy("f1")
-			.reduceGroup(new responsibilityReduceGroup())
+			.groupBy("f1").reduceGroup(new responsibilityReduceGroup())
 
 			// Calculate the R messages "r(i,k) <- s(i,k) - value" getting "value" joining
 			// similarities with previous tuple
-			.leftOuterJoin(similarities)
-			.where("f0")
-			.equalTo("f1")
-			.with(new responsibilityValue())
+			.leftOuterJoin(similarities).where("f0").equalTo("f1").with(new responsibilityValue())
 
 			// Responsibility damping
-			.join(messages)
-			.where("f0","f1")
-			.equalTo("f1","f0")
-			.with(new dampedRValue(DAMPING_FACTOR, CONVERGENCE_THRESHOLD));
+			.join(messages).where("f0","f1").equalTo("f1","f0").with(new dampedRValue(DAMPING_FACTOR, CONVERGENCE_THRESHOLD));
 
 		// Start availability message calculation
 		// a(i,k) <- min {0, r(k,k) + sum{max{0,r(I,k)}} I st I not in {i,k}
@@ -111,20 +100,13 @@ public class AffinityPropagationBulk {
 		DataSet<Tuple4<LongValue, LongValue, DoubleValue, DoubleValue>> availabilities = responsibilities
 
 			// Get the sum of the positive responsibilities and the self responsibility per target
-			.groupBy("f1")
-			.reduceGroup(new availabilityReduceGroup())
+			.groupBy("f1").reduceGroup(new availabilityReduceGroup())
 
 			// Calculate the availability
-			.leftOuterJoin(responsibilities)
-			.where("f0")
-			.equalTo("f1")
-			.with(new availabilityValue())
+			.leftOuterJoin(responsibilities).where("f0").equalTo("f1").with(new availabilityValue())
 
 			// Availability damping
-			.join(messages)
-			.where("f0","f1")
-			.equalTo("f0","f1")
-			.with(new dampedAValue(DAMPING_FACTOR, CONVERGENCE_THRESHOLD));
+			.join(messages).where("f0","f1").equalTo("f0","f1").with(new dampedAValue(DAMPING_FACTOR, CONVERGENCE_THRESHOLD));
 
 		// End iteration
 		DataSet<Tuple4<LongValue, LongValue, DoubleValue, DoubleValue>> finalMessages =
@@ -138,12 +120,10 @@ public class AffinityPropagationBulk {
 		DataSet<Tuple3<LongValue, LongValue, DoubleValue>> clusters = exemplars
 				.join(similarities).where("f0").equalTo("f1").projectSecond(0,1,2);
 
-		DataSet<Tuple3<LongValue, LongValue, DoubleValue>> clusters2 =
-			clusters.groupBy("f0").maxBy(2);
-
 		// Refine clusters assigning exemplars to themselves
-		DataSet<Tuple3<LongValue, LongValue, DoubleValue>> clusters3 =
-			clusters2.leftOuterJoin(exemplars).where("f0").equalTo("f0").with(new refineClusters());
+		DataSet<Tuple3<LongValue, LongValue, DoubleValue>> refinedClusters = clusters
+			.groupBy("f0").maxBy(2)
+			.leftOuterJoin(exemplars).where("f0").equalTo("f0").with(new refineClusters());
 
 	}
 
